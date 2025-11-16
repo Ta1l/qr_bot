@@ -5,23 +5,21 @@
 Здесь определяются все возможные состояния, в которых может находиться пользователь.
 """
 from typing import Optional
-from aiogram.fsm.state import State, StatesGroup, State
+from aiogram.fsm.state import State, StatesGroup
 
 
 class TestStates(StatesGroup):
     """Группа состояний для прохождения теста"""
+    name_question = State()                 # НОВЫЙ: Вопрос об имени
     citizenship_question = State()
-    card_blocks_question = State()
+    card_arrests_question = State()         # ПЕРЕИМЕНОВАН: Вопрос об арестах
     phone_number_question = State()
 
-    # <-- ВОТ ИЗМЕНЕНИЕ
     @classmethod
     def get_by_state_str(cls, state_str: str) -> Optional[State]:
         """
         Возвращает объект состояния по его строковому представлению.
-        Например, по "TestStates:citizenship_question" вернет TestStates.citizenship_question.
         """
-        # __states__ - это специальный атрибут StatesGroup, содержащий все состояния
         for state_obj in cls.__states__:
             if state_obj.state == state_str:
                 return state_obj
@@ -30,4 +28,4 @@ class TestStates(StatesGroup):
 
 class AdminStates(StatesGroup):
     """Группа состояний для админ-панели"""
-    choosing_user = State()  # Состояние выбора пользователя для просмотра информации
+    choosing_user = State()

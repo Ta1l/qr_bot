@@ -1,3 +1,5 @@
+# your_bot/handlers/utils.py
+
 """
 Вспомогательные функции для обработчиков.
 Содержит логику формирования результатов, валидации и другие утилиты.
@@ -7,6 +9,7 @@ import json
 import logging
 import re
 from typing import Dict, Any
+from datetime import datetime
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -14,8 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramAPIError
 
 from config import ADMIN_IDS
-from database.db_manager import save_test_result  # <-- Импортируем нашу новую функцию
-
+from database.db_manager import save_test_result
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +35,16 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
         return
 
     # Формируем красивое сообщение из данных
+    completion_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
     text = (
         f"✅ <b>Новый результат теста</b>\n\n"
         f"<b>Пользователь:</b> @{state_data.get('username', 'N/A')} (ID: {state_data.get('user_id')})\n"
-        f"<b>Гражданство РФ:</b> {state_data.get('citizenship', 'N/A')}\n"
-        f"<b>Блокировки карт:</b> {state_data.get('card_blocks', 'N/A')}\n"
-        f"<b>Телефон:</b> {state_data.get('phone_number', 'N/A')}"
+        f"<b>Имя:</b> {state_data.get('name', 'Не указано')}\n"
+        f"<b>Гражданство РФ:</b> {state_data.get('citizenship', 'Не указано')}\n"
+        f"<b>Аресты по картам:</b> {state_data.get('card_arrests', 'Не указано')}\n"
+        f"<b>Телефон:</b> <code>{state_data.get('phone_number', 'Не указан')}</code>\n\n"
+        f"<b>Время завершения:</b> {completion_time}"
     )
 
     for admin_id in ADMIN_IDS:
@@ -57,15 +63,8 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
 async def finish_test(user_id: int, state: FSMContext, bot: Bot) -> None:
     """
     Завершает тест, сохраняет результат в БД, отправляет его админам и очищает состояние.
-    
-    Args:
-        user_id: ID пользователя, завершившего тест.
-        state: Контекст FSM с сохраненными данными.
-        bot: Экземпляр объекта Bot.
     """
     data = await state.get_data()
-    
-    # Логируем данные перед сохранением
     logger.info(f"Завершение теста для пользователя {user_id}. Данные: {data}")
 
     # 1. Сохраняем результат в базу данных
@@ -82,12 +81,7 @@ async def finish_test(user_id: int, state: FSMContext, bot: Bot) -> None:
 
 
 def print_test_result(result: Dict[str, Any]) -> None:
-    """
-    Красиво выводит результат теста в консоль.
-    
-    Args:
-        result: Словарь с данными из FSM.
-    """
+    """Красиво выводит результат теста в консоль."""
     json_result = json.dumps(result, ensure_ascii=False, indent=2)
     print("\n" + "="*50)
     print("РЕЗУЛЬТАТ ТЕСТА (сохранен в БД):")
@@ -97,9 +91,7 @@ def print_test_result(result: Dict[str, Any]) -> None:
 
 
 def validate_phone_number(phone: str) -> bool:
-    """
-    Улучшенная проверка корректности номера телефона (российский формат).
-    """
+    """Улучшенная проверка корректности номера телефона (российский формат)."""
     cleaned_phone = re.sub(r'\D', '', phone)
     if len(cleaned_phone) == 11 and cleaned_phone.startswith(('7', '8')):
         return True

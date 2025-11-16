@@ -6,83 +6,100 @@
 """
 import logging
 
-from aiogram import Router, F, Bot
+from aiogram import Router, F, Bot, types
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State
 
 from .states import TestStates
 from .utils import finish_test, validate_phone_number
-from .test_flow import TEST_FLOW, VALIDATION_RULES, FAILURE_ANSWERS
+from .test_flow import TEST_FLOW, FAILURE_ANSWERS
 
 logger = logging.getLogger(__name__)
 test_router = Router(name="test_router")
+
+
+async def proceed_to_next_step(message: Message, state: FSMContext, next_state: State):
+    """Хелпер-функция для перехода к следующему шагу теста."""
+    step_config = TEST_FLOW[next_state]
+    keyboard = step_config.get("keyboard")
+    
+    await message.answer(
+        text=step_config["text"],
+        reply_markup=keyboard() if keyboard else ReplyKeyboardRemove()
+    )
+    await state.set_state(next_state)
 
 
 @test_router.callback_query(F.data == "start_test")
 async def start_test_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """
     Обработчик нажатия на кнопку "Пройти тест".
-    Запускает первый шаг теста из конфигурации.
+    Запускает первый шаг теста из новой конфигурации.
     """
-    first_step_state = TestStates.citizenship_question
-    step_config = TEST_FLOW[first_step_state]
-
-    await callback.message.answer(
-        text=step_config["text"],
-        reply_markup=step_config["keyboard"]()
-    )
-    await state.set_state(first_step_state)
+    first_step_state = TestStates.name_question
+    await proceed_to_next_step(callback.message, state, first_step_state)
     await callback.answer()
     logger.info(f"Пользователь {callback.from_user.id} (@{callback.from_user.username}) начал тест")
 
 
+@test_router.message(StateFilter(TestStates.name_question), F.text)
+async def process_name_answer(message: Message, state: FSMContext):
+    """Обработчик ответа на вопрос об имени."""
+    await state.update_data(
+        name=message.text,
+        user_id=message.from_user.id,
+        username=message.from_user.username or "Без username"
+    )
+    logger.info(f"Пользователь {message.from_user.id} ввел имя: {message.text}")
+
+    current_config = TEST_FLOW[TestStates.name_question]
+    await proceed_to_next_step(message, state, current_config["success_path"])
+
+
 @test_router.message(
-    StateFilter(TestStates.citizenship_question, TestStates.card_blocks_question),
-    lambda msg: VALIDATION_RULES[TestStates.citizenship_question](msg) or VALIDATION_RULES[TestStates.card_blocks_question](msg)
+    StateFilter(TestStates.citizenship_question, TestStates.card_arrests_question),
+    F.text.in_(["Да", "Нет"])
 )
-async def process_test_answer(message: Message, state: FSMContext, bot: Bot):
+async def process_yes_no_answer(message: Message, state: FSMContext, bot: Bot):
     """
     УНИВЕРСАЛЬНЫЙ обработчик для всех шагов теста типа "Да/Нет".
     """
     current_state_str = await state.get_state()
-    current_state = TestStates.get_by_state_str(current_state_str) # Получаем объект состояния
+    current_state = TestStates.get_by_state_str(current_state_str)
     
+    if not current_state:
+        logger.error(f"Ошибка: не удалось определить состояние для {current_state_str}")
+        return
+
     answer = message.text
     step_config = TEST_FLOW[current_state]
     
     # Сохраняем данные
     state_key = current_state.state.split(':')[-1].replace('_question', '')
-    await state.update_data(
-        {state_key: answer},
-        user_id=message.from_user.id,
-        username=message.from_user.username or "Без username"
-    )
+    await state.update_data({state_key: answer})
     logger.info(f"Пользователь {message.from_user.id} на шаге '{state_key}' ответил: {answer}")
 
-    # Проверяем, является ли ответ "провальным"
+    # 1. Проверяем на "провальный" ответ, который завершает тест
     if answer == FAILURE_ANSWERS.get(current_state):
         failure_config = step_config["failure_path"]
         await message.answer(failure_config["message"], reply_markup=ReplyKeyboardRemove())
         await finish_test(message.from_user.id, state, bot)
         return
 
-    # Если ответ успешный, переходим к следующему шагу
-    next_step_state = step_config["success_path"]
-    next_step_config = TEST_FLOW[next_step_state]
-    
-    await message.answer(
-        text=next_step_config["text"],
-        reply_markup=next_step_config["keyboard"]()
-    )
-    await state.set_state(next_step_state)
+    # 2. Проверяем на "особый случай", который отправляет доп. сообщение
+    special_cases = step_config.get("special_cases", {})
+    if answer in special_cases:
+        await message.answer(special_cases[answer]["message"])
+
+    # 3. Переходим к следующему шагу
+    await proceed_to_next_step(message, state, step_config["success_path"])
 
 
 @test_router.message(StateFilter(TestStates.phone_number_question))
 async def process_phone_number(message: Message, state: FSMContext, bot: Bot) -> None:
-    """
-    Обработчик получения номера телефона (оставлен отдельным из-за уникальной логики).
-    """
+    """Обработчик получения номера телефона."""
     phone_number = None
     if message.contact:
         phone_number = message.contact.phone_number
@@ -90,8 +107,7 @@ async def process_phone_number(message: Message, state: FSMContext, bot: Bot) ->
         phone_number = message.text
     else:
         await message.answer(
-            "Номер телефона введен некорректно. Пожалуйста, введите корректный номер "
-            "в формате +79991234567 или используйте кнопку."
+            "Номер телефона введен некорректно. Пожалуйста, введите корректный номер."
         )
         return
 
@@ -105,7 +121,7 @@ async def process_phone_number(message: Message, state: FSMContext, bot: Bot) ->
     await finish_test(message.from_user.id, state, bot)
 
 
-@test_router.message(StateFilter(TestStates.citizenship_question, TestStates.card_blocks_question))
+@test_router.message(StateFilter(TestStates.citizenship_question, TestStates.card_arrests_question))
 async def invalid_yes_no_answer(message: Message) -> None:
     """Обработчик некорректного ответа (не 'Да'/'Нет')."""
     await message.answer("Пожалуйста, используйте кнопки 'Да' или 'Нет' для ответа.")

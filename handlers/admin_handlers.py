@@ -1,3 +1,5 @@
+# your_bot/handlers/admin_handlers.py
+
 """
 Обработчики для команд администратора.
 """
@@ -43,9 +45,7 @@ async def show_all_users(message: Message, state: FSMContext):
 
 @admin_router.message(F.text == "Отмена", StateFilter(AdminStates.choosing_user))
 async def cancel_user_choice(message: Message, state: FSMContext):
-    """
-    Обработчик отмены выбора пользователя.
-    """
+    """Обработчик отмены выбора пользователя."""
     await message.answer("Действие отменено.", reply_markup=ReplyKeyboardRemove())
     await state.clear()
 
@@ -55,7 +55,6 @@ async def show_user_info(message: Message, state: FSMContext):
     """
     Обрабатывает выбор пользователя из клавиатуры и показывает по нему информацию.
     """
-    # Ищем ID в тексте кнопки с помощью регулярного выражения
     match = re.search(r"\(ID: (\d+)\)", message.text)
     if not match:
         await message.answer("Пожалуйста, выберите пользователя с помощью кнопок.")
@@ -75,12 +74,13 @@ async def show_user_info(message: Message, state: FSMContext):
     except (TypeError, ValueError):
         completion_date = "N/A"
         
-    # Формируем красивый ответ
+    # Формируем красивый ответ с новыми полями
     response_text = (
-        f"<b>ℹ️ Информация по пользователю {user_data['username']} (ID: {user_data['user_id']})</b>\n\n"
-        f"<b>Гражданство РФ:</b> {user_data['citizenship'] or 'Не указано'}\n"
-        f"<b>Блокировки по картам:</b> {user_data['card_blocks'] or 'Не указано'}\n"
-        f"<b>Номер телефона:</b> <code>{user_data['phone_number'] or 'Не указан'}</code>\n"
+        f"<b>ℹ️ Информация по пользователю {user_data.get('username', 'N/A')} (ID: {user_data.get('user_id')})</b>\n\n"
+        f"<b>Имя:</b> {user_data.get('name') or 'Не указано'}\n"
+        f"<b>Гражданство РФ:</b> {user_data.get('citizenship') or 'Не указано'}\n"
+        f"<b>Аресты по картам:</b> {user_data.get('card_arrests') or 'Не указано'}\n"
+        f"<b>Номер телефона:</b> <code>{user_data.get('phone_number') or 'Не указан'}</code>\n\n"
         f"<b>Дата прохождения:</b> {completion_date}"
     )
 
