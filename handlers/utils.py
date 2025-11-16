@@ -8,8 +8,8 @@
 import json
 import logging
 import re
-from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone # <-- ИЗМЕНЕНИЕ: импортируем timezone
+from zoneinfo import ZoneInfo           # <-- ИЗМЕНЕНИЕ: импортируем ZoneInfo
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -25,17 +25,16 @@ logger = logging.getLogger(__name__)
 async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
     """
     Отправляет отформатированный результат теста всем администраторам.
-    
-    Args:
-        bot: Экземпляр объекта Bot для отправки сообщений.
-        state_data: Словарь с данными из FSM.
     """
     if not ADMIN_IDS:
         logger.warning("Переменная ADMIN_IDS пуста. Уведомления не будут отправлены.")
         return
 
-    # Формируем красивое сообщение из данных
-    completion_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # ===> ИЗМЕНЕНИЕ ЗДЕСЬ <===
+    # 1. Получаем текущее время в UTC.
+    # 2. Конвертируем его в часовой пояс "Europe/Moscow".
+    # 3. Форматируем в строку.
+    completion_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Europe/Moscow")).strftime('%Y-%m-%d %H:%M:%S')
     
     text = (
         f"✅ <b>Новый результат теста</b>\n\n"
@@ -44,7 +43,7 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
         f"<b>Гражданство РФ:</b> {state_data.get('citizenship', 'Не указано')}\n"
         f"<b>Аресты по картам:</b> {state_data.get('card_arrests', 'Не указано')}\n"
         f"<b>Телефон:</b> <code>{state_data.get('phone_number', 'Не указан')}</code>\n\n"
-        f"<b>Время завершения:</b> {completion_time}"
+        f"<b>Время завершения (МСК):</b> {completion_time}" # Добавил (МСК) для ясности
     )
 
     for admin_id in ADMIN_IDS:
@@ -59,6 +58,7 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
         except Exception as e:
             logger.error(f"Непредвиденная ошибка при отправке сообщения администратору {admin_id}: {e}")
 
+# ... (остальной код файла остается без изменений) ...
 
 async def finish_test(user_id: int, state: FSMContext, bot: Bot) -> None:
     """
@@ -66,17 +66,9 @@ async def finish_test(user_id: int, state: FSMContext, bot: Bot) -> None:
     """
     data = await state.get_data()
     logger.info(f"Завершение теста для пользователя {user_id}. Данные: {data}")
-
-    # 1. Сохраняем результат в базу данных
     await save_test_result(data)
-
-    # 2. Выводим результат в консоль для отладки
     print_test_result(data)
-
-    # 3. Отправляем уведомление администраторам
     await notify_admins(bot, data)
-    
-    # 4. Очищаем состояние пользователя
     await state.clear()
 
 
