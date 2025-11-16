@@ -113,7 +113,7 @@ async def process_phone_number(message: Message, state: FSMContext, bot: Bot) ->
     
     # 1. Формируем новое финальное сообщение
     registration_link_placeholder = "(ссылка на регистрацию)"
-    instruction_link = "https://clck.ru/3QMBnN"
+    instruction_link = "https://clck.ru/3QMBsz"
     support_user_placeholder = "*юзер*"
 
     final_text = (
