@@ -8,8 +8,9 @@
 import json
 import logging
 import re
-from datetime import datetime, timezone # <-- ИЗМЕНЕНИЕ: импортируем timezone
-from zoneinfo import ZoneInfo           # <-- ИЗМЕНЕНИЕ: импортируем ZoneInfo
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from typing import Dict, Any # <-- ВОТ ЭТА СТРОКА БЫЛА ПРОПУЩЕНА
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -30,10 +31,6 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
         logger.warning("Переменная ADMIN_IDS пуста. Уведомления не будут отправлены.")
         return
 
-    # ===> ИЗМЕНЕНИЕ ЗДЕСЬ <===
-    # 1. Получаем текущее время в UTC.
-    # 2. Конвертируем его в часовой пояс "Europe/Moscow".
-    # 3. Форматируем в строку.
     completion_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Europe/Moscow")).strftime('%Y-%m-%d %H:%M:%S')
     
     text = (
@@ -43,7 +40,7 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
         f"<b>Гражданство РФ:</b> {state_data.get('citizenship', 'Не указано')}\n"
         f"<b>Аресты по картам:</b> {state_data.get('card_arrests', 'Не указано')}\n"
         f"<b>Телефон:</b> <code>{state_data.get('phone_number', 'Не указан')}</code>\n\n"
-        f"<b>Время завершения (МСК):</b> {completion_time}" # Добавил (МСК) для ясности
+        f"<b>Время завершения (МСК):</b> {completion_time}"
     )
 
     for admin_id in ADMIN_IDS:
@@ -61,9 +58,6 @@ async def notify_admins(bot: Bot, state_data: Dict[str, Any]) -> None:
 # ... (остальной код файла остается без изменений) ...
 
 async def finish_test(user_id: int, state: FSMContext, bot: Bot) -> None:
-    """
-    Завершает тест, сохраняет результат в БД, отправляет его админам и очищает состояние.
-    """
     data = await state.get_data()
     logger.info(f"Завершение теста для пользователя {user_id}. Данные: {data}")
     await save_test_result(data)
@@ -73,7 +67,6 @@ async def finish_test(user_id: int, state: FSMContext, bot: Bot) -> None:
 
 
 def print_test_result(result: Dict[str, Any]) -> None:
-    """Красиво выводит результат теста в консоль."""
     json_result = json.dumps(result, ensure_ascii=False, indent=2)
     print("\n" + "="*50)
     print("РЕЗУЛЬТАТ ТЕСТА (сохранен в БД):")
@@ -83,7 +76,6 @@ def print_test_result(result: Dict[str, Any]) -> None:
 
 
 def validate_phone_number(phone: str) -> bool:
-    """Улучшенная проверка корректности номера телефона (российский формат)."""
     cleaned_phone = re.sub(r'\D', '', phone)
     if len(cleaned_phone) == 11 and cleaned_phone.startswith(('7', '8')):
         return True
