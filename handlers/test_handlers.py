@@ -76,27 +76,24 @@ async def process_yes_no_answer(message: Message, state: FSMContext, bot: Bot):
     answer = message.text
     step_config = TEST_FLOW[current_state]
     
-    # Сохраняем данные
     state_key = current_state.state.split(':')[-1].replace('_question', '')
     await state.update_data({state_key: answer})
     logger.info(f"Пользователь {message.from_user.id} на шаге '{state_key}' ответил: {answer}")
 
-    # 1. Проверяем на "провальный" ответ, который завершает тест
     if answer == FAILURE_ANSWERS.get(current_state):
         failure_config = step_config["failure_path"]
         await message.answer(failure_config["message"], reply_markup=ReplyKeyboardRemove())
         await finish_test(message.from_user.id, state, bot)
         return
 
-    # 2. Проверяем на "особый случай", который отправляет доп. сообщение
     special_cases = step_config.get("special_cases", {})
     if answer in special_cases:
         await message.answer(special_cases[answer]["message"])
 
-    # 3. Переходим к следующему шагу
     await proceed_to_next_step(message, state, step_config["success_path"])
 
 
+# ===> ИЗМЕНЕНИЯ ЗДЕСЬ <===
 @test_router.message(StateFilter(TestStates.phone_number_question))
 async def process_phone_number(message: Message, state: FSMContext, bot: Bot) -> None:
     """Обработчик получения номера телефона."""
@@ -114,10 +111,21 @@ async def process_phone_number(message: Message, state: FSMContext, bot: Bot) ->
     await state.update_data(phone_number=phone_number)
     logger.info(f"Пользователь {message.from_user.id} предоставил номер: {phone_number}")
     
-    await message.answer(
-        "✅ Спасибо! Тест успешно завершен.\nВаши данные отправлены на проверку.",
-        reply_markup=ReplyKeyboardRemove()
+    # 1. Формируем новое финальное сообщение
+    registration_link_placeholder = "(ссылка на регистрацию)"
+    instruction_link = "https://clck.ru/3QMBnN"
+    support_user_placeholder = "*юзер*"
+
+    final_text = (
+        f"✅ Тест пройден! Вот Ваша ссылка на регистрацию - {registration_link_placeholder}.\n\n"
+        f"Инструкция по регистрации - {instruction_link}.\n"
+        f"Поддержка - {support_user_placeholder}."
     )
+    
+    # 2. Отправляем его пользователю
+    await message.answer(final_text, reply_markup=ReplyKeyboardRemove(), parse_mode=None)
+
+    # 3. Завершаем тест (отправляем данные админу и т.д.)
     await finish_test(message.from_user.id, state, bot)
 
 
