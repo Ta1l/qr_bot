@@ -114,7 +114,7 @@ async def process_phone_number(message: Message, state: FSMContext, bot: Bot) ->
     # 1. Формируем новое финальное сообщение
     registration_link_placeholder = "(ссылка на регистрацию)"
     instruction_link = "https://clck.ru/3QMBsz"
-    support_user_placeholder = "*юзер*"
+    support_user_placeholder = "@Lavka_Job_Support"
 
     final_text = (
         f"✅ Тест пройден! Вот Ваша ссылка на регистрацию - {registration_link_placeholder}.\n\n"

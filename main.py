@@ -9,7 +9,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
-from handlers import test_router, admin_router # <-- Добавляем admin_router
+from handlers import test_router, admin_router 
 from handlers.keyboards import get_start_test_keyboard
 from database.db_manager import init_db
 
@@ -20,13 +20,21 @@ dp = Dispatcher(storage=MemoryStorage())
 
 # Подключаем роутеры
 dp.include_router(test_router)
-dp.include_router(admin_router) # <-- Подключаем новый роутер
+dp.include_router(admin_router)
 
 
 @dp.message(Command("start"))
 async def command_start_handler(message: Message) -> None:
     await message.answer(
-        text="Тут приветственное сообщение!",
+        text=(
+            "🏠 <b>Работаешь в своем районе = экономишь время и силы.</b>\n\n"
+            "В Яндекс Лавке ты не тратишь часы на дорогу. Вышел из дома, взял велосипед (мы выдадим!) — и ты уже зарабатываешь.\n\n"
+            "🔹 Смены по 4-12 часов (как тебе удобно).\n"
+            "🔹 Выплаты без задержек.\n"
+            "🔹 Можно совмещать с учебой.\n\n"
+            "Есть ли места в твоем районе и какой велосипед тебе доступен?\n"
+            "<b>Узнай прямо сейчас ⤵️</b>"
+        ),
         reply_markup=get_start_test_keyboard(),
         parse_mode=ParseMode.HTML
     )

@@ -24,7 +24,7 @@ def get_start_test_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Пройти тест",
+                    text="🚀 Поехали!",
                     callback_data="start_test"
                 )
             ]
